@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Q&A AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --surface: rgba(30, 41, 59, 0.7);
+            --surface-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --error: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--surface-border);
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.2);
+        }
+
+        /* SECTION 1 */
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .file-drop-area {
+            width: 100%;
+            border: 2px dashed var(--primary);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.3s;
+            box-sizing: border-box;
+        }
+
+        .file-drop-area:hover, .file-drop-area.dragover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: scale(1.02);
+        }
+
+        .btn:disabled {
+            background: rgba(99, 102, 241, 0.5);
+            cursor: not-allowed;
+        }
+
+        /* SECTION 2 */
+        .qa-section {
+            display: none; /* hidden initially */
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--surface-border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .response-area {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid var(--surface-border);
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .sources {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--surface-border);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .sources span {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        /* Utility */
+        .message {
+            text-align: center;
+            font-size: 0.9rem;
+            min-height: 1.2rem;
+            font-weight: 500;
+        }
+
+        .error { color: var(--error); }
+        .success { color: var(--success); }
+        .info { color: var(--text-muted); }
+
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Document Q&A AI</h1>
+
+        <!-- SECTION 1: UPLOAD -->
+        <div class="card upload-section" id="section-upload">
+            <div class="file-drop-area" id="drop-area" onclick="document.getElementById('file-input').click()">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📄</div>
+                <div id="file-name-display" style="font-weight: 500;">Click to browse or drag & drop a .pdf file here</div>
+                <input type="file" id="file-input" accept=".pdf">
+            </div>
+            
+            <button class="btn" id="upload-btn" disabled>
+                <div class="loader" id="upload-loader"></div>
+                <span id="upload-text">Upload Document</span>
+            </button>
+            <div class="message" id="upload-message"></div>
+        </div>
+
+        <!-- SECTION 2: Q&A -->
+        <div class="card qa-section" id="section-qa">
+            <h2 style="margin-top:0; font-size:1.2rem;">Ask a Question</h2>
+            <textarea id="question-input" placeholder="Type your question about the document here..."></textarea>
+            
+            <button class="btn" id="ask-btn">
+                <div class="loader" id="ask-loader"></div>
+                <span id="ask-text">Ask Question</span>
+            </button>
+            <div class="message" id="ask-message"></div>
+
+            <div class="response-area" id="response-area">
+                <h3 style="margin-top:0; color:var(--primary); font-size:1rem; margin-bottom: 1rem;">Answer</h3>
+                <div id="answer-text" style="line-height:1.6;"></div>
+                <div class="sources" id="sources-container">
+                    <strong style="display: block; margin-bottom: 0.5rem;">Source Chunks:</strong> 
+                    <div id="sources-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8000';
+        let currentDocumentId = null;
+
+        // Elements
+        const fileInput = document.getElementById('file-input');
+        const dropArea = document.getElementById('drop-area');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadMessage = document.getElementById('upload-message');
+        const uploadLoader = document.getElementById('upload-loader');
+        const uploadText = document.getElementById('upload-text');
+
+        const sectionQa = document.getElementById('section-qa');
+        const questionInput = document.getElementById('question-input');
+        const askBtn = document.getElementById('ask-btn');
+        const askMessage = document.getElementById('ask-message');
+        const askLoader = document.getElementById('ask-loader');
+        const askText = document.getElementById('ask-text');
+        
+        const responseArea = document.getElementById('response-area');
+        const answerText = document.getElementById('answer-text');
+        const sourcesContainer = document.getElementById('sources-container');
+        const sourcesList = document.getElementById('sources-list');
+
+        // File Selection Logic
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (!file.name.toLowerCase().endsWith('.pdf')) {
+                    showMessage(uploadMessage, 'Error: Only .pdf files are allowed.', 'error');
+                    uploadBtn.disabled = true;
+                    fileNameDisplay.textContent = 'Invalid file type';
+                } else {
+                    fileNameDisplay.textContent = file.name;
+                    showMessage(uploadMessage, '', 'info');
+                    uploadBtn.disabled = false;
+                }
+            }
+        });
+
+        // Drag and Drop
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+        dropArea.addEventListener('dragleave', () => dropArea.classList.remove('dragover'));
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Upload Logic
+        uploadBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            setLoading(uploadBtn, uploadLoader, uploadText, 'Uploading & Processing...');
+            showMessage(uploadMessage, '', '');
+
+            try {
+                const response = await fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || `Upload failed with status ${response.status}`);
+                }
+
+                currentDocumentId = data.document_id;
+                showMessage(uploadMessage, `Success! '${data.filename}' embedded into ${data.total_chunks} chunks.`, 'success');
+                
+                // Show Q&A Section
+                sectionQa.style.display = 'flex';
+
+            } catch (error) {
+                showMessage(uploadMessage, error.message, 'error');
+            } finally {
+                stopLoading(uploadBtn, uploadLoader, uploadText, 'Upload Document');
+            }
+        });
+
+        // Ask Logic
+        askBtn.addEventListener('click', async () => {
+            const question = questionInput.value.trim();
+            if (!question) {
+                showMessage(askMessage, 'Please enter a question.', 'error');
+                return;
+            }
+
+            if (!currentDocumentId) {
+                showMessage(askMessage, 'No document ID found. Please upload again.', 'error');
+                return;
+            }
+
+            setLoading(askBtn, askLoader, askText, 'Thinking...');
+            showMessage(askMessage, '', '');
+            responseArea.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_URL}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        document_id: currentDocumentId,
+                        question: question
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || `Failed to get answer (Status ${response.status})`);
+                }
+
+                // Display Answer
+                answerText.textContent = data.answer;
+                
+                // Display Sources
+                if (data.sources && data.sources.length > 0) {
+                    sourcesList.innerHTML = data.sources.map(s => `<span>#${s}</span>`).join('');
+                    sourcesContainer.style.display = 'block';
+                } else {
+                    sourcesContainer.style.display = 'none';
+                }
+
+                responseArea.style.display = 'block';
+
+            } catch (error) {
+                showMessage(askMessage, error.message, 'error');
+            } finally {
+                stopLoading(askBtn, askLoader, askText, 'Ask Question');
+            }
+        });
+
+        // Helpers
+        function showMessage(element, msg, type) {
+            element.textContent = msg;
+            element.className = 'message ' + type;
+        }
+
+        function setLoading(btn, loader, textEl, loadingText) {
+            btn.disabled = true;
+            loader.style.display = 'inline-block';
+            textEl.textContent = loadingText;
+        }
+
+        function stopLoading(btn, loader, textEl, defaultText) {
+            btn.disabled = false;
+            loader.style.display = 'none';
+            textEl.textContent = defaultText;
+        }
+    </script>
+</body>
+</html>

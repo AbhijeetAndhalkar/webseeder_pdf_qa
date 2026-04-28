@@ -1,0 +1,17 @@
+# Python Virtual Environments
+venv/
+.venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Environment Variables
+.env
+
+# ChromaDB Storage
+chroma_db/
+*.sqlite3
+
+# macOS
+.DS_Store
