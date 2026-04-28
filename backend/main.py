@@ -1,4 +1,5 @@
 import os
+import tempfile
 import traceback
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,24 +33,19 @@ async def health_check():
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
     """Accepts a .pdf file, temporarily saves it, processes it, and cleans up."""
-    # 415: Wrong file type
     if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=415, detail="Wrong file type. Only .pdf files are allowed.")
+        raise HTTPException(status_code=415, detail="Only .pdf files are allowed.")
         
-    temp_file_path = f"temp_{file.filename}"
-    
+    # Create a temporary file in the SYSTEM temp folder (outside your project)
+    # This prevents Uvicorn and Live Server from detecting a change!
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        content = await file.read()
+        tmp.write(content)
+        temp_file_path = tmp.name
+
     try:
-        # Temporarily save the uploaded PDF to disk
-        with open(temp_file_path, "wb") as f:
-            f.write(await file.read())
-            
-        # Pass the file path to our updated rag.py (PyPDFLoader)
         doc_id, total_chunks = process_document(temp_file_path, file.filename)
         valid_document_ids.add(doc_id)
-        
-        # Instantly delete the temporary file after successful parsing
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
         
         return {
             "document_id": doc_id,
@@ -57,13 +53,13 @@ async def upload_document(file: UploadFile = File(...)):
             "total_chunks": total_chunks
         }
     except Exception as e:
-        # Ensure we delete the file even if an error occurs
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-            
         print(f"Error processing document: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal server error while processing the document.")
+    finally:
+        # Clean up the temp file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 @app.post("/ask", response_model=AskResponse)
 async def ask_question(request: AskRequest):
