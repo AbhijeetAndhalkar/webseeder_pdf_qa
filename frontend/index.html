@@ -2,17 +2,38 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!-- 
+      Interviewer point: What does the viewport meta tag do?
+      It ensures the webpage renders properly on mobile devices by setting the width of the page to follow the screen-width of the device.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Q&A AI</title>
+    
+    <!-- 
+      Interviewer point: Why load fonts from a CDN like Google Fonts?
+      It offloads the font delivery to Google's fast, globally distributed servers. The browser may also have it cached if the user visited another site using the same font.
+    -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; padding: 20px; }
+        /* 
+          Interviewer point: Explain your CSS choices here.
+          - We use Flexbox on the body (display: flex; justify-content: center;) to center the main container horizontally.
+          - We use max-width: 600px; so the UI is responsive. It stretches to 100% on small screens but caps out at 600px on desktop.
+        */
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; padding: 20px; margin: 0; box-sizing: border-box; }
         .container { width: 100%; max-width: 600px; }
         .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
-        .btn { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: 600; margin-top: 10px; }
-        .btn:disabled { background: #334155; }
-        #qa-section { display: none; margin-top: 20px; } /* Hidden by default */
-        textarea { width: 100%; background: #0f172a; color: white; border: 1px solid #334155; padding: 10px; border-radius: 6px; margin-top: 10px; }
-        #response { background: #0f172a; padding: 15px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #6366f1; }
+        .btn { background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: 600; margin-top: 10px; transition: background 0.2s ease; }
+        .btn:hover:not(:disabled) { background: #4f46e5; }
+        .btn:disabled { background: #334155; cursor: not-allowed; opacity: 0.7; }
+        
+        #qa-section { display: none; margin-top: 20px; } /* Hidden by default. We modify this via JavaScript when upload is successful. */
+        
+        textarea { width: 100%; background: #0f172a; color: white; border: 1px solid #334155; padding: 10px; border-radius: 6px; margin-top: 10px; box-sizing: border-box; resize: vertical; font-family: 'Inter', sans-serif; }
+        textarea:focus { outline: none; border-color: #6366f1; } /* Improve accessibility with clear focus states */
+        
+        #response { background: #0f172a; padding: 15px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #6366f1; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -20,6 +41,11 @@
         <h1>Webseeder PDF AI</h1>
         
         <div class="card">
+            <!-- 
+              Interviewer point: Why use accept=".pdf"?
+              It acts as a client-side filter in the file picker dialog. However, NEVER trust the client! 
+              The backend must still validate that the uploaded file is truly a PDF, which is why we check the extension in FastAPI.
+            -->
             <input type="file" id="pdfFile" accept=".pdf">
             <button type="button" id="uploadBtn" class="btn">Upload Document</button>
             <p id="status" style="font-size: 0.8rem; color: #94a3b8; margin-top: 10px;"></p>
@@ -27,44 +53,75 @@
 
         <div id="qa-section" class="card">
             <h3>Ask a Question</h3>
-            <textarea id="questionInput" placeholder="What is this document about?"></textarea>
+            <textarea id="questionInput" placeholder="What is this document about?" rows="3"></textarea>
             <button type="button" id="askBtn" class="btn">Get Answer</button>
             <div id="response" style="display:none"></div>
         </div>
         
-        <button type="button" onclick="document.getElementById('qa-section').style.display='block'" style="background:none; border:none; color:#334155; cursor:pointer; font-size:0.7rem">Manual Reveal Q&A</button>
+        <button type="button" onclick="document.getElementById('qa-section').style.display='block'" style="background:none; border:none; color:#334155; cursor:pointer; font-size:0.7rem; margin-top: 10px;">Manual Reveal Q&A</button>
     </div>
 
     <script>
+        // Interviewer point: Why grab these elements once at the top?
+        // Querying the DOM (like document.getElementById) is relatively slow. By caching references to these elements,
+        // we improve runtime performance when the user interacts with the app.
         const uploadBtn = document.getElementById('uploadBtn');
         const pdfFile = document.getElementById('pdfFile');
         const status = document.getElementById('status');
         const qaSection = document.getElementById('qa-section');
+        
+        // State variable to hold the unique document ID generated by the backend
         let docId = "";
 
         uploadBtn.addEventListener('click', async () => {
-            if (!pdfFile.files[0]) return alert("Select a file!");
+            // Interviewer point: Why check for files[0]? 
+            // Because <input type="file"> can theoretically accept multiple files if the 'multiple' attribute is set. We just want the first one.
+            if (!pdfFile.files[0]) {
+                return alert("Select a file!");
+            }
             
+            // Interviewer point: What is FormData?
+            // FormData is an API used to construct multipart/form-data payloads. 
+            // It is strictly required for transmitting binary file data via HTTP requests.
             const formData = new FormData();
             formData.append('file', pdfFile.files[0]);
 
+            // Give user immediate UI feedback and disable the button to prevent double-clicking / duplicate submissions
             status.innerText = "Processing... (Check your terminal)";
             uploadBtn.disabled = true;
 
             try {
-                const res = await fetch('http://127.0.0.1:8000/upload', { method: 'POST', body: formData });
+                // Interviewer point: Explain fetch and async/await.
+                // fetch() is the modern browser API for network requests.
+                // async/await allows asynchronous code to be read and structured synchronously, preventing "callback hell".
+                // Note: We DO NOT set 'Content-Type' headers here. When fetch sees FormData, it automatically sets 'Content-Type: multipart/form-data' and calculates the required data boundary.
+                const res = await fetch('http://127.0.0.1:8000/upload', { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                
+                // Parse the JSON response body
                 const data = await res.json();
                 
+                // Interviewer point: What does res.ok mean?
+                // res.ok is a boolean that evaluates to true if the HTTP status code is in the 200-299 range. 
+                // This cleanly handles 4xx or 5xx backend errors (e.g., 415 Unsupported Media Type).
                 if (res.ok) {
-                    docId = data.document_id;
+                    docId = data.document_id; // Store the UUID globally so the Ask API can use it
                     status.innerText = "✅ Success! Ask your question below.";
-                    qaSection.style.display = 'block'; // THIS REVEALS THE BOX
+                    qaSection.style.display = 'block'; // Dynamically reveal the QA section UI
                 } else {
                     status.innerText = "❌ Error: " + data.detail;
                 }
             } catch (e) {
+                // Interviewer point: When does the catch block trigger in fetch?
+                // A fetch() Promise ONLY rejects on network failures (e.g., CORS issues, server completely down, DNS failure).
+                // It DOES NOT reject on HTTP errors like 404 or 500 (which is why we need `res.ok` above).
                 status.innerText = "❌ Connection Failed! Restart Uvicorn.";
             } finally {
+                // Interviewer point: Why use finally?
+                // The finally block executes regardless of whether the try block succeeded or threw an error.
+                // This ensures we always re-enable the button, preventing the UI from getting permanently stuck in a disabled state.
                 uploadBtn.disabled = false;
             }
         });
@@ -73,19 +130,31 @@
             const question = document.getElementById('questionInput').value;
             const respDiv = document.getElementById('response');
             
+            // Basic frontend validation: Prevent sending empty queries to the backend to save resources
+            if (!question.trim()) return;
+
             respDiv.style.display = "block";
             respDiv.innerText = "AI is thinking...";
 
             try {
+                // Interviewer point: How do you send JSON data with fetch?
+                // 1. Set the 'Content-Type: application/json' header.
+                // 2. Use JSON.stringify() to serialize the JavaScript object into a JSON string payload.
                 const res = await fetch('http://127.0.0.1:8000/ask', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ document_id: docId, question: question })
                 });
+                
                 const data = await res.json();
-                respDiv.innerText = data.answer;
+                
+                if (res.ok) {
+                    respDiv.innerText = data.answer;
+                } else {
+                    respDiv.innerText = "❌ Error: " + data.detail;
+                }
             } catch (e) {
-                respDiv.innerText = "AI Error. Check Ollama terminal.";
+                respDiv.innerText = "❌ AI Error. Check backend terminal.";
             }
         });
     </script>

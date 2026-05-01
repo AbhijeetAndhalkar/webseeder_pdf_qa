@@ -7,7 +7,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 from langchain_ollama import ChatOllama
-
+# A Document is just a custom LangChain container. It has two compartments: one for the text (page_content), and one for the sticky notes (metadata).
 # Initialize local HuggingFace embeddings
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
@@ -46,7 +46,8 @@ def process_document(file_path: str, filename: str) -> Tuple[str, int]:
     
     if not texts:
         return doc_id, 0
-
+        
+    # We create a list of Document objects. Each Document contains a small chunk of text along with its metadata (sticky notes).
     docs = []
     for i, text in enumerate(texts):
         metadata = {
@@ -85,9 +86,11 @@ def answer_question(doc_id: str, question: str) -> Tuple[str, List[int]]:
     
     for doc in retrieved_docs:
         context_texts.append(doc.page_content)
+        # Extract the chunk_number metadata from the Document object to show the user which chunks were used as sources
         if "chunk_number" in doc.metadata:
             source_chunks.append(doc.metadata["chunk_number"])
             
+    # context_str is the combined text of the top 3 chunks retrieved from the ChromaDB vector store.
     context_str = "\n\n---\n\n".join(context_texts)
     
     # Strict prompt to prevent hallucinations
@@ -104,9 +107,10 @@ Answer:"""
 
     prompt = prompt_template.format(context=context_str, question=question)
     
-    # Send the prompt to the local phi3 model
+    # Send the strict prompt (which includes the 3 retrieved ChromaDB chunks as context) to the local phi3 model
     response = llm.invoke(prompt)
     answer = response.content.strip()
+    
     
     # Clear sources if the model couldn't find the answer
     if answer == "The answer is not available in the document.":

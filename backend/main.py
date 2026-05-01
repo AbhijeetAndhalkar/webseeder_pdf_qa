@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from models import AskRequest, AskResponse
 from rag import process_document, answer_question
 
-app = FastAPI(title="Document Q&A API")
+# The traceback module is used to print the full error stack trace to the terminal, which is critical for debugging issues.
+app = FastAPI(title="Document Q&A API") # Initializes the FastAPI application, serving as the core HTTP engine of our backend.
 
 # Enable CORS for the frontend
 app.add_middleware(
@@ -18,7 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory tracking of uploaded document IDs to handle 404s properly
+# In-memory tracking of uploaded document IDs to handle 404s properly.
+# We use a set() here because looking up an ID in a set has O(1) time complexity (extremely fast).
 valid_document_ids = set()
 
 @app.get("/health")
@@ -45,8 +47,10 @@ async def upload_document(file: UploadFile = File(...)):
 
     try:
         doc_id, total_chunks = process_document(temp_file_path, file.filename)
-        valid_document_ids.add(doc_id)
+        valid_document_ids.add(doc_id) # Adds the newly generated unique document ID to our tracker set
         
+        # We hand the temp file to the rag.py logic, get a unique ID back, save that ID to our set, 
+        # and tell the frontend it was successful by returning this JSON response.
         return {
             "document_id": doc_id,
             "filename": file.filename,
@@ -61,6 +65,7 @@ async def upload_document(file: UploadFile = File(...)):
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
+# response_model=AskResponse guarantees the outgoing JSON data strictly matches the Pydantic schema defined in models.py.
 @app.post("/ask", response_model=AskResponse)
 async def ask_question(request: AskRequest):
     """Answers a question based on the document context."""
@@ -80,3 +85,5 @@ async def ask_question(request: AskRequest):
         print(f"LLM Call Failed: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=503, detail="LLM call failed.")
+# To run this FastAPI application locally, use the command: `uvicorn main:app --reload`
+# The `/ask` endpoint sends the doc_id and question to the answer_question function in rag.py, which returns the answer and the source chunks used.
