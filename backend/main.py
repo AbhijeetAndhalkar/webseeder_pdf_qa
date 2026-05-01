@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from models import AskRequest, AskResponse
 from rag import process_document, answer_question
 
-# The traceback module is used to print the full error stack trace to the terminal, which is critical for debugging issues.
+# The traceback module is used to PRINT FULL ERROR MSG TO TERMINAL, which is critical for debugging issues.
 app = FastAPI(title="Document Q&A API") # Initializes the FastAPI application, serving as the core HTTP engine of our backend.
 
 # Enable CORS for the frontend
